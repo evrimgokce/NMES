@@ -1,0 +1,282 @@
+---
+title: "Comparing Rehabilitation With and Without Neuromuscular Electrical Stimulation in Hospitalized Older Adults: Cognitive, Functional, and Acceptability Outcomes From a Pragmatic Pilot Study"
+author: "EG"
+date: "24/06/2025"
+
+# 1) Data set-up and management
+
+# Load packages
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(performance)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(magick)
+library(fmsb)
+
+
+# Read the dataset
+Data <- read_excel("NMES.xlsx")
+
+# Check data structure
+str(Data)
+summary(Data)
+
+# Calculate missing data percentage
+missing_data <- colSums(is.na(Data)) / nrow(Data) * 100
+print(missing_data)
+
+# 2) Baseline Participant Characteristics by group
+
+# Ensure Group variable is categorical
+Data$Group <- as.factor(Data$Group)
+
+# Count the number of participants by Group, Sex, and Handedness
+distribution <- Data %>%
+  group_by(Group, Sex, Handedness) %>%
+  summarise(Count = n(), .groups = "drop")
+
+# Display results
+print(distribution)
+
+# 3) Data Preparation
+
+# Convert relevant variables to factors
+Data <- Data %>%
+  mutate(
+    Time = factor(Time, levels = c(1, 2), labels = c("Pre", "Post")),
+    SubjectID = as.factor(SubjectID)
+  )
+
+# 4) Linear Mixed-Effects Models — Mobility Outcomes
+# Adjusted for Age, Sex, BMI
+
+# TM6 (Six minutes walk test)
+m_tm6 <- lmer(TM6 ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_tm6)
+
+# Chair Test
+m_chair <- lmer(Chair_test ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_chair)
+
+# Tinetti
+m_tinetti <- lmer(Tinetti ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_tinetti)
+
+# 5) Linear Mixed-Effects Models — Cognitive Outcomes
+# Adjusted for Age, Sex, Education
+
+# Working Memory - RT
+m_wm_rt <- lmer(WM_RT ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_wm_rt)
+
+# Working Memory - Accuracy
+m_wm_acc <- lmer(WM_Acc ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_wm_acc)
+
+# Go/NoGo - RT
+m_gng_rt <- lmer(GG_RT ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_gng_rt)
+
+# Flexibility - Errors
+m_flex_err <- lmer(F_error ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
+summary(m_flex_err)
+
+# Post-hoc for Flexibility
+emm_flex <- emmeans(m_flex_err, ~ Time | Group)
+contrast(emm_flex, method = "pairwise")
+
+# 6) Model Diagnostics — For All Models
+
+# List of all fitted models
+model_list <- list(
+  m_tm6 = m_tm6,
+  m_chair = m_chair,
+  m_tinetti = m_tinetti,
+  m_wm_rt = m_wm_rt,
+  m_wm_acc = m_wm_acc,
+  m_gng_rt = m_gng_rt,
+  m_flex_err = m_flex_err
+)
+
+# Loop through each model and run diagnostics
+for (model_name in names(model_list)) {
+  cat("\n===== Diagnostics for", model_name, "=====\n")
+  model <- model_list[[model_name]]
+  
+  print(check_model(model))
+  print(check_normality(model))
+  print(check_heteroscedasticity(model))
+  print(check_collinearity(model))
+  print(check_outliers(model))
+}
+
+# 7) Acceptability Score — Group Comparison (t-test)
+
+# Filter pre-intervention data
+accept_data <- Data %>%
+  filter(Time == "Pre", !is.na(Acceptability)) %>%
+  droplevels()
+
+# T-test
+t.test(Acceptability ~ Group, data = accept_data, var.equal = TRUE)
+
+# Optional: Wilcoxon test
+wilcox.test(Acceptability ~ Group, data = accept_data)
+
+# Radar Plot — Acceptability Scores by Group
+
+# Define relevant variable names
+accept_vars <- c(
+  "AffectiveAttitude", "Effort", "Ethicality", "PerceivedEffectiveness",
+  "InterventionCoherence", "SelfEfficacy", "OpportunityCosts", "GeneralAcceptability"
+)
+
+# Clean the data
+accept_data <- Accept[complete.cases(Accept[, accept_vars]), ]
+
+# Calculate group means
+mean_NMES <- colMeans(accept_data[accept_data$Group == "A", accept_vars])
+mean_Usual <- colMeans(accept_data[accept_data$Group == "B", accept_vars])
+
+# Combine data for radar chart
+radar_data <- rbind(
+  rep(5, length(accept_vars)),  # Max scale
+  rep(1, length(accept_vars)),  # Min scale
+  mean_NMES,
+  mean_Usual
+)
+rownames(radar_data) <- c("Max", "Min", "NMES", "Usual Care")
+
+# Optional: Pretty variable labels
+var_labels <- c(
+  "Affective Attitude", "Effort", "Ethicality",
+  "Perceived Effectiveness", "Intervention Coherence",
+  "Self-Efficacy", "Opportunity Costs", "General Acceptability"
+)
+
+# Create radar chart
+radarchart(radar_data,
+           axistype = 1,
+           pcol = c("royalblue", "pink"),
+           plwd = 3,
+           plty = 1,
+           cglcol = "grey",
+           cglty = 1,
+           axislabcol = "black",
+           caxislabels = seq(1, 5, 1),
+           vlabels = var_labels,
+           vlcex = 1.0,
+           title = "Acceptability Profile by Group")
+
+# Add legend
+legend("topright", legend = c("NMES", "Usual Care"),
+       col = c("royalblue", "pink"), lty = 1, lwd = 3, bty = "n")
+
+# 8) Summary Figure — Flexibility Errors
+
+# Group summary
+summary_data <- Data %>%
+  group_by(Group, Time) %>%
+  summarise(
+    mean_score = mean(F_error, na.rm = TRUE),
+    sd_score = sd(F_error, na.rm = TRUE),
+    n = n(),
+    se = sd_score / sqrt(n),
+    .groups = 'drop'
+  )
+
+# Plot
+ggplot(summary_data, aes(x = Group, y = mean_score, fill = Time)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = mean_score - se, ymax = mean_score + se),
+                position = position_dodge(0.7), width = 0.2) +
+  labs(y = "Task-switching Error Score", x = NULL, fill = "Time") +
+  scale_fill_manual(values = c("gray70", "pink"), labels = c("Pre", "Post")) +
+  theme_minimal(base_size = 14)
+
+# 9) Time-Based Bar Plots for Multiple Outcome Variables
+
+# Define the variables to plot
+time_vars <- c("TM6", "TUG_DT", "Tinetti", "Chair_test")
+
+# Recode Time as pre/post if needed
+Data <- Data %>%
+  mutate(Time = recode(Time, `1` = "pre", `2` = "post"),
+         Time = factor(Time, levels = c("pre", "post")))
+
+# Function to create and save a plot
+plot_time_summary <- function(data, var_name, p_value = NULL) {
+  # Dynamically summarize the variable
+  summary_data <- data %>%
+    group_by(Time) %>%
+    summarise(
+      mean = mean(.data[[var_name]], na.rm = TRUE),
+      se = sd(.data[[var_name]], na.rm = TRUE) / sqrt(n()),
+      .groups = "drop"
+    )
+  
+  # Y-axis position for annotation
+  y_max <- max(summary_data$mean + summary_data$se, na.rm = TRUE)
+  line_y <- y_max + 2
+  text_y <- line_y + 5
+  
+  # Plot
+  p <- ggplot(summary_data, aes(x = Time, y = mean, fill = Time)) +
+    geom_bar(stat = "identity", width = 0.6) +
+    geom_errorbar(aes(ymin = mean - se, ymax = mean + se), width = 0.15) +
+    labs(title = paste(var_name, "Over Time"), y = var_name, x = NULL) +
+    theme_minimal(base_size = 14) +
+    theme(
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(color = "black"),
+      axis.ticks = element_line(color = "black"),
+      axis.ticks.x = element_blank(),
+      axis.ticks.length = unit(5, "pt"),
+      axis.text.x = element_text(size = 14),
+      axis.text.y = element_text(size = 14),
+      axis.title.y = element_text(size = 16, face = "bold"),
+      legend.position = "none",
+      plot.margin = margin(5, 5, 5, 5, "mm")
+    ) +
+    scale_fill_manual(values = c("grey", "pink")) +
+    scale_x_discrete(expand = c(0.4, 0.4)) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 5), minor_breaks = NULL)
+
+  # Optional p-value annotation
+  if (!is.null(p_value)) {
+    p <- p +
+      geom_segment(aes(x = 1.3, xend = 1.7, y = line_y, yend = line_y), size = 0.6) +
+      nnotate("text", x = 1.5, y = text_y, label = paste("p =", p_value), size = 5)
+  }
+
+  print(p)
+}
+
+# 10) Combine Multiple Images into a Panel Figure
+
+# Load the images
+img1 <- image_read("5XSTS.png")
+img2 <- image_read("6mwt.png")
+img3 <- image_read("Tinetti.png")
+img4 <- image_read("TUG_DT.png")
+
+# Combine them
+top_row    <- image_append(c(img1, img2))
+bottom_row <- image_append(c(img3, img4))
+combined   <- image_append(c(top_row, bottom_row), stack = TRUE)
+
+# Save the final image
+image_write(combined, path = "outputs/figures/combined_figure.png", format = "png")
+
+
+
+
+
+
+

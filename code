@@ -57,14 +57,17 @@ Data <- Data %>%
 # TM6 (Six minutes walk test)
 m_tm6 <- lmer(TM6 ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_tm6)
+confint(lmem_model, method = "Wald")
 
 # Chair Test
 m_chair <- lmer(Chair_test ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_chair)
+confint(lmem_model, method = "Wald")
 
 # Tinetti
 m_tinetti <- lmer(Tinetti ~ Time * Group + Age + Sex + BMI + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_tinetti)
+confint(lmem_model, method = "Wald")
 
 # 5) Linear Mixed-Effects Models — Cognitive Outcomes
 # Adjusted for Age, Sex, Education
@@ -72,18 +75,22 @@ summary(m_tinetti)
 # Working Memory - RT
 m_wm_rt <- lmer(WM_RT ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_wm_rt)
+confint(lmem_model, method = "Wald")
 
 # Working Memory - Accuracy
 m_wm_acc <- lmer(WM_Acc ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_wm_acc)
+confint(lmem_model, method = "Wald")
 
 # Go/NoGo - RT
 m_gng_rt <- lmer(GG_RT ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_gng_rt)
+confint(lmem_model, method = "Wald")
 
 # Flexibility - Errors
 m_flex_err <- lmer(F_error ~ Time * Group + Age + Sex + Education + (1 | SubjectID), data = Data, REML = FALSE)
 summary(m_flex_err)
+confint(lmem_model, method = "Wald")
 
 # Post-hoc for Flexibility
 emm_flex <- emmeans(m_flex_err, ~ Time | Group)

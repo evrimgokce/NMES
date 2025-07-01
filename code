@@ -259,7 +259,7 @@ plot_time_summary <- function(data, var_name, p_value = NULL) {
   if (!is.null(p_value)) {
     p <- p +
       geom_segment(aes(x = 1.3, xend = 1.7, y = line_y, yend = line_y), size = 0.6) +
-      nnotate("text", x = 1.5, y = text_y, label = paste("p =", p_value), size = 5)
+      annotate("text", x = 1.5, y = text_y, label = paste("p =", p_value), size = 5)
   }
 
   print(p)

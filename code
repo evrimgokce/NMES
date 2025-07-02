@@ -196,14 +196,34 @@ summary_data <- Data %>%
     .groups = 'drop'
   )
 
-# Plot
-ggplot(summary_data, aes(x = Group, y = mean_score, fill = Time)) +
+p_value <- "0.036*"
+
+line_y <- max(summary_data$mean_score + summary_data$se) + 2
+text_y <- line_y + 0.5
+
+p <- ggplot(summary_data, aes(x = Group, y = mean_score, fill = Time)) +
   geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
   geom_errorbar(aes(ymin = mean_score - se, ymax = mean_score + se),
                 position = position_dodge(0.7), width = 0.2) +
-  labs(y = "Task-switching Error Score", x = NULL, fill = "Time") +
-  scale_fill_manual(values = c("gray70", "pink"), labels = c("Pre", "Post")) +
-  theme_minimal(base_size = 14)
+  labs(y = "Task-Switching Error Score", x = NULL, fill = "Time") +
+  scale_fill_manual(values = c("gray70", "pink")) +
+  scale_x_discrete(labels = c("NMES_APA" = "NMES + Usual care", "APA" = "Usual care")) +
+  theme_minimal(base_size = 14) +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(color = "black"),
+    axis.title.y = element_text(face = "bold")  # Y ekseni başlığını kalın yapar
+  )
+
+if (!is.null(p_value)) {
+  p <- p +
+    geom_segment(aes(x = 1.2, xend = 0.8, y = line_y, yend = line_y), size = 0.6) +
+    annotate("text", x = 1.0, y = text_y, label = paste("p =", p_value), size = 5)
+}
+
+print(p)
 
 # 9) Time-Based Bar Plots for Multiple Outcome Variables
 
